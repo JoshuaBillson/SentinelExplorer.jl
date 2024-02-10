@@ -1,0 +1,3 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+SentinelExplorer = "e5d154b4-4325-4737-9c37-b2b3515e42eb"
