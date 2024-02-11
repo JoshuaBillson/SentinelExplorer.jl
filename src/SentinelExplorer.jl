@@ -55,7 +55,7 @@ Authenticate with your Copernicus Data Space credentials.
 The username and password may be passed explicitly, or provided as a pair of environment variables.
 
 In the case of the latter, `get_access_token()` expects your username and password to be provided as the 
-environment variables "SENTINEL_EXPLORER_USER" and "SENTINEL_EXPLORER_PASS".
+environment variables `SENTINEL_EXPLORER_USER` and `SENTINEL_EXPLORER_PASS`.
 
 # Parameters
 - `username`: Your Copernicus Data Space username.

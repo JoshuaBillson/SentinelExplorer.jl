@@ -44,6 +44,10 @@ roi = [
     result = search("SENTINEL-2", product="L2A", tile="11UPT", dates=dates)[1,:Name]
     @test !isnothing(match(r"S2B_MSIL2A_20200804T183919_N\d{4}_R\d{3}_T11UPT", result))
 
+    # Test Search With Clouds
+    result = search("SENTINEL-2", product="L2A", tile="11UPT", dates=dates, clouds=5)[1,:Name]
+    @test !isnothing(match(r"S2B_MSIL2A_20200804T183919_N\d{4}_R\d{3}_T11UPT", result))
+
     # Test Scene ID
     scene, id_test = search("SENTINEL-2", product="L2A", tile="11UPT", dates=dates)[1,[:Name,:Id]]
     id = get_scene_id(scene)
@@ -51,7 +55,7 @@ roi = [
     @test_throws ArgumentError get_scene_id("foo")
 
     # Test Authentication
-    token_success = get_access_token(ENV["SENTINEL_EXPLORER_USER"], ENV["SENTINEL_EXPLORER_PASS"])
+    token_success = get_access_token()
     @test token_success isa String
     Logging.with_logger(Logging.NullLogger()) do
         token_fail = get_access_token(ENV["SENTINEL_EXPLORER_USER"], "fail")

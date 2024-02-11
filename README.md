@@ -31,7 +31,7 @@ bb = BoundingBox((52.1, -114.4), (51.9, -114.1))
 p = Point(52.0, -114.25)
 
 # Search For Sentinel-2 Imagery Intersecting our ROI Between August 1 2020 and August 9 2020
-dates = (DateTime(2020, 8, 1), DateTime(2020, 8, 9)
+dates = (DateTime(2020, 8, 1), DateTime(2020, 8, 9))
 results_1 = search("SENTINEL-2", dates=dates, geom=roi)
 
 # Limit Search to Scenes with no More Than 15% Clouds
