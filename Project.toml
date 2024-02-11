@@ -15,5 +15,6 @@ ZipFile = "a5390f91-8eb1-5f08-bee0-b1d1ffed6cea"
 
 [compat]
 DataFrames = "1"
+WellKnownGeometry = "0.2"
 ZipFile = "0.10"
 julia = "1"
