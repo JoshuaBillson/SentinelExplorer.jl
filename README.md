@@ -21,7 +21,7 @@ You can then install `SentinelExplorer` from the official Julia repository like 
 ```julia
 using SentinelExplorer, GeoDataFrames, Dates
 
-# Load Region of Interest From External GeoJSON or Shapefile
+# Load Region of Interest from External GeoJSON or Shapefile
 roi = GeoDataFrames.read("data/roi.geojson").geometry |> first
 
 # Define Region of Interest as a Bounding Box
