@@ -59,7 +59,8 @@ roi = [
     end
 
     # Test Download
-    downloaded = download_scene(scene, token_success, unzip=true)
-    @test isdir(downloaded)
-    rm(downloaded, recursive=true)
+    scenes = search("SENTINEL-2", tile="11UPT", dates=dates).Name[1:2]
+    downloaded = download_scenes(scenes, get_access_token(), unzip=true)
+    @test all(isdir.(downloaded))
+    foreach(x -> rm(x, recursive=true), downloaded)
 end

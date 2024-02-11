@@ -14,7 +14,9 @@ Construct a point located at the provided latitude and longitude.
 - `lon`: The longitude of the point.
 
 # Example
+```julia
 p = Point(52.0, -114.25)
+```
 """
 struct Point{T}
     lat::T
@@ -34,7 +36,9 @@ All coordinates should be provided in latitude and longitude.
 - `lr`: The lower-right corner of the box as a `Tuple{T,T}` of latitude and longitude.
 
 # Example
+```julia
 bb = BoundingBox((52.1, -114.4), (51.9, -114.1))
+```
 """
 struct BoundingBox{T}
     ul::Tuple{T,T}
@@ -253,7 +257,7 @@ function get_scene_id(scene)
 end
 
 """
-    download_scene(scene, access_token; dir=pwd(), unzip=false)
+    download_scene(scene, access_token; dir=pwd(), unzip=false, log_progress=true)
 
 Download the requested Sentinel scene using the provided access token.
 
@@ -264,16 +268,9 @@ Download the requested Sentinel scene using the provided access token.
 # Keywords
 - `dir`: The destination directory of the downloaded scene (default = pwd()).
 - `unzip`: If true, unzips and deletes the downloaded zip file (default = false).
-
-# Example
-```julia
-julia> scene = "S2B_MSIL2A_20200804T183919_N0500_R070_T11UPT_20230321T050221";
-
-julia> get_scene_id(scene)
-"29f0eaaf-0b15-412b-9597-16c16d4d79c6"
-```
+- `log_progress`: If true, logs the download progress at 1-second intervals (default = true).
 """
-function download_scene(scene, access_token; dir=pwd(), unzip=false)
+function download_scene(scene, access_token; dir=pwd(), unzip=false, log_progress=true)
     # Lookup Scene ID
     id = get_scene_id(scene)
 
@@ -282,7 +279,8 @@ function download_scene(scene, access_token; dir=pwd(), unzip=false)
     headers = Dict("Authorization" => "Bearer $access_token")
 
     # Download Scene
-    downloaded = HTTP.download(url, dir, headers=headers)
+    update_period = log_progress ? 1 : Inf
+    downloaded = HTTP.download(url, dir, headers=headers, update_period=update_period)
     if unzip
         # Unzip and Remove ZipFile
         _unzip(downloaded)
@@ -294,6 +292,30 @@ function download_scene(scene, access_token; dir=pwd(), unzip=false)
     else
         return downloaded
     end
+end
+
+"""
+    download_scenes(scenes, access_token; dir=pwd(), unzip=false)
+
+Download multiple scenes in parallel.
+
+The number of parallel downloads is determined by `Threads.nthreads()`.
+
+# Parameters
+- `scenes`: A list of scenes to download.
+- `access_token`: A token returned by a previous call to `get_access_token`.
+
+# Keywords
+- `dir`: The destination directory of the downloaded scene (default = pwd()).
+- `unzip`: If true, unzips and deletes the downloaded zip file (default = false).
+"""
+function download_scenes(scenes, access_token; dir=pwd(), unzip=false)
+    files = ["", ""]
+    Threads.@threads for i in eachindex(scenes)
+        file = download_scene(scenes[i], access_token; dir=dir, unzip=unzip, log_progress=false)
+        files[i] = file
+    end
+    return files
 end
 
 function _to_wkt(geom)
@@ -345,7 +367,6 @@ function _unzip(file,exdir="")
     close(zarchive)
 end
 
-export Point, BoundingBox, get_access_token, search, get_scene_id, download_scene
-
+export Point, BoundingBox, get_access_token, search, get_scene_id, download_scene, download_scenes
 
 end
