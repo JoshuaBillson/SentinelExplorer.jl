@@ -57,14 +57,17 @@ roi = [
     # Test Authentication
     token_success = get_access_token()
     @test token_success isa String
-    Logging.with_logger(Logging.NullLogger()) do
-        token_fail = get_access_token(ENV["SENTINEL_EXPLORER_USER"], "fail")
-        @test isnothing(token_fail)
-    end
+    @test_throws ArgumentError get_access_token(ENV["SENTINEL_EXPLORER_USER"], "fail")
 
-    # Test Download
+    # Test Download Fail
     scenes = search("SENTINEL-2", tile="11UPT", dates=dates).Name[1:2]
-    downloaded = download_scenes(scenes, get_access_token(), unzip=true)
+    true_pass = ENV["SENTINEL_EXPLORER_PASS"]
+    authenticate(ENV["SENTINEL_EXPLORER_USER"], "fail")
+    @test_throws ArgumentError download_scenes(scenes, unzip=true)
+
+    # Test Download Success
+    authenticate(ENV["SENTINEL_EXPLORER_USER"], true_pass)
+    downloaded = download_scenes(scenes, unzip=true)
     @test all(isdir.(downloaded))
     foreach(x -> rm(x, recursive=true), downloaded)
 end

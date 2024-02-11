@@ -47,10 +47,33 @@ struct BoundingBox{T}
 end
 
 """
+    authenticate(username, password)
+
+Authenticate with your Copernicus Data Space credentials.
+
+Sets the environment variables `SENTINEL_EXPLORER_USER` and `SENTINEL_EXPLORER_PASS`, which will
+be used to authenticate future requests.
+
+# Parameters
+- `username`: Your Copernicus Data Space username.
+- `password`: Your Copernicus Data Space password.
+
+# Example
+```julia
+authenticate("my_username", "my_password")
+token = get_access_token()
+```
+"""
+function authenticate(username, password)
+    ENV["SENTINEL_EXPLORER_USER"] = username
+    ENV["SENTINEL_EXPLORER_PASS"] = password
+end
+
+"""
     get_access_token()
     get_access_token(username, password)
 
-Authenticate with your Copernicus Data Space credentials.
+Receive a data access token with the provided credentials.
 
 The username and password may be passed explicitly, or provided as a pair of environment variables.
 
@@ -77,19 +100,19 @@ function get_access_token(username, password)
         "password" => password,
         "grant_type" => "password")
     
+    status_error = nothing
     try
         auth_url = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
         response = HTTP.post(auth_url, body=data)
         return @pipe String(response.body) |> JSON.parse |> _["access_token"]
     catch e
-        @error """
-        Authentication failed with response code $(e.status)!
-
-        Response:
-        $(e.response)
-        """
-        return nothing
+        if e isa HTTP.Exceptions.StatusError
+            status_error = e
+        else
+            throw(e)
+        end
     end
+    throw(ArgumentError("Authentication failed with response code $(status_error.status)!\n\n$(status_error.response)"))
 end
 
 function get_access_token()
@@ -257,24 +280,25 @@ function get_scene_id(scene)
 end
 
 """
-    download_scene(scene, access_token; dir=pwd(), unzip=false, log_progress=true)
+    download_scene(scene, dir=pwd(); unzip=false, log_progress=true, access_token=nothing)
 
 Download the requested Sentinel scene using the provided access token.
 
 # Parameters
-- `scene`: The name of the Sentinel scene to download.
-- `access_token`: A token returned by a previous call to `get_access_token`.
+- `scene`: The name of the jentinel scene to download.
+- `dir`: The destination directory of the downloaded scene (default = pwd()).
 
 # Keywords
-- `dir`: The destination directory of the downloaded scene (default = pwd()).
 - `unzip`: If true, unzips and deletes the downloaded zip file (default = false).
 - `log_progress`: If true, logs the download progress at 1-second intervals (default = true).
+- `access_token`: A token to authenticate the request. Calls `get_access_token()` if `nothing` (default).
 """
-function download_scene(scene, access_token; dir=pwd(), unzip=false, log_progress=true)
+function download_scene(scene, dir=pwd(); unzip=false, log_progress=true, access_token=nothing)
     # Lookup Scene ID
     id = get_scene_id(scene)
 
     # Prepare Headers
+    access_token = isnothing(access_token) ? get_access_token() : access_token
     url = "https://zipper.dataspace.copernicus.eu/odata/v1/Products($id)/\$value"
     headers = Dict("Authorization" => "Bearer $access_token")
 
@@ -295,7 +319,7 @@ function download_scene(scene, access_token; dir=pwd(), unzip=false, log_progres
 end
 
 """
-    download_scenes(scenes, access_token; dir=pwd(), unzip=false)
+    download_scenes(scenes, dir=pwd(); unzip=false, access_token=nothing)
 
 Download multiple scenes in parallel.
 
@@ -303,16 +327,17 @@ The number of parallel downloads is determined by `Threads.nthreads()`.
 
 # Parameters
 - `scenes`: A list of scenes to download.
-- `access_token`: A token returned by a previous call to `get_access_token`.
 
 # Keywords
 - `dir`: The destination directory of the downloaded scene (default = pwd()).
 - `unzip`: If true, unzips and deletes the downloaded zip file (default = false).
+- `access_token`: A token to authenticate the request. Calls `get_access_token()` if `nothing` (default).
 """
-function download_scenes(scenes, access_token; dir=pwd(), unzip=false)
+function download_scenes(scenes, dir=pwd(); unzip=false, access_token=nothing)
     files = ["", ""]
+    access_token = isnothing(access_token) ? get_access_token() : access_token
     Threads.@threads for i in eachindex(scenes)
-        file = download_scene(scenes[i], access_token; dir=dir, unzip=unzip, log_progress=false)
+        file = download_scene(scenes[i], dir, unzip=unzip, log_progress=false, access_token=access_token)
         files[i] = file
     end
     return files
@@ -367,6 +392,6 @@ function _unzip(file,exdir="")
     close(zarchive)
 end
 
-export Point, BoundingBox, get_access_token, search, get_scene_id, download_scene, download_scenes
+export Point, BoundingBox, authenticate, get_access_token, search, get_scene_id, download_scene, download_scenes
 
 end
