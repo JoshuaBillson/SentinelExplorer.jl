@@ -76,7 +76,7 @@ function get_access_token(username, password)
     try
         auth_url = "https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token"
         response = HTTP.post(auth_url, body=data)
-		return @pipe String(response.body) |> JSON.parse |> _["access_token"]
+        return @pipe String(response.body) |> JSON.parse |> _["access_token"]
     catch e
         @error """
         Authentication failed with response code $(e.status)!
@@ -129,78 +129,78 @@ julia> search("SENTINEL-2",  geom=geom, dates=dates)
 ```
 """
 function search(satellite::String; product=nothing, dates=nothing, tile=nothing, clouds=nothing, geom=nothing, max_results=100)
-	# Product Filter
-	satellites = ["SENTINEL-1", "SENTINEL-2", "SENTINEL-3"]
-	!(satellite in satellites) && throw(ArgumentError("satellite must be one of $satellites"))
-	filters = ["Collection/Name eq '$satellite'"]
-	
-	# product Filter
-	if !isnothing(product)
-		push!(filters, "contains(Name,'$product')")
-	end
+    # Product Filter
+    satellites = ["SENTINEL-1", "SENTINEL-2", "SENTINEL-3"]
+    !(satellite in satellites) && throw(ArgumentError("satellite must be one of $satellites"))
+    filters = ["Collection/Name eq '$satellite'"]
+    
+    # product Filter
+    if !isnothing(product)
+        push!(filters, "contains(Name,'$product')")
+    end
 
-	# Dates Filter
-	if !isnothing(dates)
+    # Dates Filter
+    if !isnothing(dates)
         dates[1] > dates[2] && throw(ArgumentError("dates must ordered from oldest to newest!"))
-		start_string = Dates.format(dates[1], "yyyy-mm-ddTHH:MM:SS.sssZ")
-		end_string = Dates.format(dates[2], "yyyy-mm-ddTHH:MM:SS.sssZ")
-		df = "ContentDate/Start gt $start_string and ContentDate/Start lt $end_string"
-		push!(filters, df)
-	end
+        start_string = Dates.format(dates[1], "yyyy-mm-ddTHH:MM:SS.sssZ")
+        end_string = Dates.format(dates[2], "yyyy-mm-ddTHH:MM:SS.sssZ")
+        df = "ContentDate/Start gt $start_string and ContentDate/Start lt $end_string"
+        push!(filters, df)
+    end
 
-	# Tile Filter
-	if !isnothing(tile)
+    # Tile Filter
+    if !isnothing(tile)
         satellite != "SENTINEL-2" && throw(ArgumentError("tile filter is only supported for SENTINEL-2!"))
-		dtype = "OData.CSC.StringAttribute"
-		tf = "Attributes/$dtype/any(att:att/Name eq 'tileId' and att/$dtype/Value eq '$tile')"
-		push!(filters, tf)
-	end
+        dtype = "OData.CSC.StringAttribute"
+        tf = "Attributes/$dtype/any(att:att/Name eq 'tileId' and att/$dtype/Value eq '$tile')"
+        push!(filters, tf)
+    end
 
-	# Cloud Filter
-	if !isnothing(clouds)
+    # Cloud Filter
+    if !isnothing(clouds)
         satellite == "SENTINEL-1" && throw(ArgumentError("cloud filter is not supported for SENTINEL-1!"))
-		dtype = "OData.CSC.DoubleAttribute"
-		cf = "Attributes/$dtype/any(att:att/Name eq 'cloudCover' and att/$dtype/Value lt $clouds)"
-		push!(filters, cf)
-	end
+        dtype = "OData.CSC.DoubleAttribute"
+        cf = "Attributes/$dtype/any(att:att/Name eq 'cloudCover' and att/$dtype/Value lt $clouds)"
+        push!(filters, cf)
+    end
 
-	# Geometry Filter
-	if !isnothing(geom)
-		wkt = _to_wkt(geom)
-		gf = "OData.CSC.Intersects(area=geography'SRID=4326;$wkt')"
-		push!(filters, gf)
-	end
+    # Geometry Filter
+    if !isnothing(geom)
+        wkt = _to_wkt(geom)
+        gf = "OData.CSC.Intersects(area=geography'SRID=4326;$wkt')"
+        push!(filters, gf)
+    end
 
-	# Construct Query
-	query_string = join(filters, " and ")
-	query = Dict(
-		"\$filter" => query_string, 
-		"\$expand" => "Attributes", 
-		"\$top" => max_results, 
-		"\$orderby" => "ContentDate/Start asc" )
-	url = "https://catalogue.dataspace.copernicus.eu/odata/v1/Products"
-	response = HTTP.get(url, query=query)
+    # Construct Query
+    query_string = join(filters, " and ")
+    query = Dict(
+        "\$filter" => query_string, 
+        "\$expand" => "Attributes", 
+        "\$top" => max_results, 
+        "\$orderby" => "ContentDate/Start asc" )
+    url = "https://catalogue.dataspace.copernicus.eu/odata/v1/Products"
+    response = HTTP.get(url, query=query)
 
-	# Process Results
-	if response.status == 200
-		# Read Results Into DataFrame
-		df = @pipe response.body |> String |> JSON.parse |> _["value"] |> DataFrame
+    # Process Results
+    if response.status == 200
+        # Read Results Into DataFrame
+        df = @pipe response.body |> String |> JSON.parse |> _["value"] |> DataFrame
 
-		# Throw Error if Results are Empty
-		nrow(df) == 0 && throw(ErrorException("Search Returned Zero Results."))
+        # Throw Error if Results are Empty
+        nrow(df) == 0 && throw(ErrorException("Search Returned Zero Results."))
 
-		# Prepare DataFrame
-		get_value(x) = isempty(x) ? missing : x[1]["Value"]
-		get_clouds(xs) = filter(x -> x["Name"] == "cloudCover", xs) |> get_value
-	
-		@pipe df |>
-		filter(:Online => identity, _) |>
-		transform(_, :Attributes => ByRow(get_clouds) => :CloudCover) |>
-		transform(_, :ContentDate => ByRow(x -> x["Start"]) => :AcquisitionDate) |>
-		_[!,[:Name, :AcquisitionDate, :PublicationDate, :CloudCover, :Id]]
-	else
-		throw(ErrorException("Search Returned $(response.status)."))
-	end
+        # Prepare DataFrame
+        get_value(x) = isempty(x) ? missing : x[1]["Value"]
+        get_clouds(xs) = filter(x -> x["Name"] == "cloudCover", xs) |> get_value
+    
+        @pipe df |>
+        filter(:Online => identity, _) |>
+        transform(_, :Attributes => ByRow(get_clouds) => :CloudCover) |>
+        transform(_, :ContentDate => ByRow(x -> x["Start"]) => :AcquisitionDate) |>
+        _[!,[:Name, :AcquisitionDate, :PublicationDate, :CloudCover, :Id]]
+    else
+        throw(ErrorException("Search Returned $(response.status)."))
+    end
 end
 
 """
@@ -226,7 +226,7 @@ function get_scene_id(scene)
     # Query Filters
     filters = String[]
 
-	# Get Sensing Time
+    # Get Sensing Time
     m = match(r"(\d{8})T", scene)
     if !isnothing(m)
         sense_time = DateTime(m[1], "yyyymmdd")
@@ -235,14 +235,14 @@ function get_scene_id(scene)
         df = "ContentDate/Start gt $start_string and ContentDate/Start lt $end_string"
         push!(filters, df)
     end
-	
+    
     # Name Filter
-	nf = "contains(Name,'$scene')"
+    nf = "contains(Name,'$scene')"
     push!(filters, nf)
 
     # Prepare Query
-	url = "https://catalogue.dataspace.copernicus.eu/odata/v1/Products"
-	query = Dict("\$filter" => join(filters, " and "), "\$expand" => "Attributes", )
+    url = "https://catalogue.dataspace.copernicus.eu/odata/v1/Products"
+    query = Dict("\$filter" => join(filters, " and "), "\$expand" => "Attributes", )
 
     # Post Query
     response = @pipe HTTP.get(url, query=query).body |> String |> JSON.parse
@@ -274,15 +274,15 @@ julia> get_scene_id(scene)
 ```
 """
 function download_scene(scene, access_token; dir=pwd(), unzip=false)
-	# Lookup Scene ID
-	id = get_scene_id(scene)
+    # Lookup Scene ID
+    id = get_scene_id(scene)
 
-	# Prepare Headers
-	url = "https://zipper.dataspace.copernicus.eu/odata/v1/Products($id)/\$value"
-	headers = Dict("Authorization" => "Bearer $access_token")
+    # Prepare Headers
+    url = "https://zipper.dataspace.copernicus.eu/odata/v1/Products($id)/\$value"
+    headers = Dict("Authorization" => "Bearer $access_token")
 
-	# Download Scene
-	downloaded = HTTP.download(url, dir, headers=headers)
+    # Download Scene
+    downloaded = HTTP.download(url, dir, headers=headers)
     if unzip
         # Unzip and Remove ZipFile
         _unzip(downloaded)
@@ -314,16 +314,16 @@ function _to_wkt(geom::BoundingBox)
 end
 
 function _latlon_to_lonlat(wkt::String)
-	lon_lat = @pipe wkt |>
-	eachmatch(r"(-?\d+\.\d*\s-?\d+\.\d*)", _) |>  # Extract Lat/Lon Values
-	first.(collect(_)) |>                         # Extract Matches
-	split.(_, " ") |>                             # Split Lat/Lon at Space
-	reverse.(_) |>                                # Reverse Lat/Lon
-	join.(_, " ") |>                              # Join Lon/Lat With Space
-	join(_, ",")                                  # Join Coordinates With Commas
+    lon_lat = @pipe wkt |>
+    eachmatch(r"(-?\d+\.\d*\s-?\d+\.\d*)", _) |>  # Extract Lat/Lon Values
+    first.(collect(_)) |>                         # Extract Matches
+    split.(_, " ") |>                             # Split Lat/Lon at Space
+    reverse.(_) |>                                # Reverse Lat/Lon
+    join.(_, " ") |>                              # Join Lon/Lat With Space
+    join(_, ",")                                  # Join Coordinates With Commas
 
-	shape, paren = match(r"([A-Z]+\s?\(+)[^)]*(\)+)", wkt) .|> string
-	return join([shape, lon_lat, paren], "")
+    shape, paren = match(r"([A-Z]+\s?\(+)[^)]*(\)+)", wkt) .|> string
+    return join([shape, lon_lat, paren], "")
 end
 
 function _unzip(file,exdir="")
