@@ -1,7 +1,7 @@
 name = "SentinelExplorer"
 uuid = "e5d154b4-4325-4737-9c37-b2b3515e42eb"
 authors = ["Joshua Billson"]
-version = "0.0.1"
+version = "0.1.0"
 
 [deps]
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
